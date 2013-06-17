@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Map</title>
+  <script type="text/javascript" src="lib/jquery.min.js"></script>
+  <script type="text/javascript" src="lib/jquery.tablesorter.js"></script>
+  <link rel="stylesheet" type="text/css" href="lib/jquery.tablesorter.css" />
+  <script src="lib/jquery-ui-1.8.16.custom/js/jquery-ui-1.8.16.custom.min.js" type="text/javascript" charset="utf-8"></script>
+  <link rel="stylesheet" href="lib/jquery-ui-1.8.16.custom/css/smoothness/jquery-ui-1.8.16.custom.css" type="text/css" charset="utf-8" />
+  <script src="http://openlayers.org/api/OpenLayers.js" type="text/javascript"></script>
+  <script src="http://ecn.dev.virtualearth.net/mapcontrol/mapcontrol.ashx?v=6.2" type="text/javascript"></script>
+
+  <script src="lib/HeatmapLayer.js" type="text/javascript"></script>
+
+  <link rel="stylesheet" type="text/css" href="master.css" />
+  <script src="coords.js" type="text/javascript"></script>
+
+  <script type="text/javascript" charset="utf-8">
+  var heat;
+  $(function() {
+    
+    // var EPSG4326 = new OpenLayers.Projection("EPSG:4326");
+    // var EPSG900913 = new OpenLayers.Projection("EPSG:900913");
+    // var b = 20037508.34;
+    // var map;
+    // OpenLayers.ImgPath = "http://js.mapbox.com/theme/dark/"
+    var map;
+ 
+    map = new OpenLayers.Map('map', {
+      controls: [
+        new OpenLayers.Control.Navigation(),
+        new OpenLayers.Control.PanZoomBar(),
+        new OpenLayers.Control.LayerSwitcher({'ascending':false}),
+        new OpenLayers.Control.MousePosition(),
+      ]
+      // units: 'm',
+    });
+
+
+    heat = new Heatmap.Layer("Heatmap");
+    coordinates.forEach(function(coord) {
+      var lonlat = new OpenLayers.LonLat(coord[0], coord[1]);
+      var point = new Heatmap.Source(lonlat);
+      heat.addSource(point);
+    });
+
+    heat.defaultIntensity = parseFloat(localStorage.heat_intensity) || heat.defaultIntensity;
+    heat.defaultRadius = parseFloat(localStorage.heat_radius) || heat.defaultRadius;
+    heat.setOpacity(parseFloat(localStorage.heat_opacity) || 0.5);
+
+    var shaded = new OpenLayers.Layer.VirtualEarth("VirtualEarth Shaded", {
+      type: VEMapStyle.Shaded,
+      animationEnabled: false
+    });
+
+    var wms = new OpenLayers.Layer.WMS("OpenLayers WMS", "http://labs.metacarta.com/wms/vmap0", {layers: 'basic'});
+    map.addLayers([shaded, wms, heat]);
+    map.zoomToExtent(heat.getDataExtent());
+
+    $("#intensity-slider").slider({
+      min: 0.0,
+      max: 0.5,
+      step: 0.01,
+      value: heat.defaultIntensity,
+      change: function(event, ui) {
+        heat.defaultIntensity = localStorage.heat_intensity = ui.value;
+        heat.redraw();
+      }
+    });
+    $("#radius-slider").slider({
+      min: 0,
+      max: 50,
+      step: 0.1,
+      value: heat.defaultRadius,
+      change: function(event, ui) {
+        heat.defaultRadius = localStorage.heat_radius = ui.value;
+        heat.redraw();
+      }
+    });
+    $("#opacity-slider").slider({
+      min: 0,
+      max: 1,
+      step: 0.01,
+      value: heat.opacity,
+      change: function(event, ui) {
+        localStorage.heat_opacity = ui.value;
+        heat.setOpacity(ui.value);
+        heat.redraw();
+      }
+    });
+    // heat.setOpacity(0.5);
+  });
+  </script>
+</head>
+<body>
+  <div style="width: 800px; margin: auto">
+    <div id="map" style='height:600px'></div>
+    <div id="controls">
+      <div><label>Radius</label><p id='radius-slider'></p></div>
+      <div><label>Intensity</label><p id='intensity-slider'></p></div>
+      <div><label>Opacity</label><p id='opacity-slider'></p></div>
+    </div>
+  </div>
+
+  <div id="footer">
+    UI &copy; 2011 <a href="mailto:io@henrian.com">Christopher Brown</a> &middot;
+    <a href="http://henrian.com">henrian.com</a>
+  </div>
+</body>
+</html>

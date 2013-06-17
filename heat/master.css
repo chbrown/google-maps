@@ -1,0 +1,34 @@
+body { margin: 0px; font: 14px Arial, Verdana; }
+#container { margin: 20px; }
+canvas { border: 1px dotted #aaa; }
+label { font-size: 80%; font-weight: bold; }
+.middle { vertical-align: middle; }
+
+#controls {
+}
+#controls p {
+  vertical-align: top;
+  display: inline-block;
+  margin: 10px;
+  width: 80%;
+}
+#controls label {
+  vertical-align: top;
+  font-weight: bold;
+  font-size: 90%;
+  display: inline-block;
+  width: 80px;
+  margin: 10px;
+}
+  
+#footer {
+  background: #222;
+  color: white;
+  text-align: center;
+  margin-top: 30px;
+  padding: 2px;
+  font: 11px "Courier New", "Times New Roman", Georgia, serif;
+}
+#footer a {
+  color: white;
+}

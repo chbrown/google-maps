@@ -1,0 +1,8 @@
+{
+  "staticPattern": "lib/{file}",
+  "staticDependencies": {
+    "jquery": "*",
+    "underscore": "*",
+    "backbone": "*"
+  }
+}

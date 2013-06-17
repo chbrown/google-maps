@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<title>Simple Geolocation with Google vs. Browser</title>
+<script src="https://www.google.com/jsapi"></script>
+<script src="google-maps.js"></script>
+<dl>
+  <dt>navigator.geolocation.getCurrentPosition (browser)
+    <dd><span id="browser"></span>
+  <dt>google.loader.ClientLocation (Google)
+    <dd><span id="google"></span>
+</dl>
+
+<script>
+var google_html = 'Not set';
+var google_location = google.loader.ClientLocation;
+if (google_location) {
+  google_html = 'Lat/Lon: ' + google_location.latitude + ' / ' + google_location.longitude + ' &middot; Location: ' + google_location.address.city + ', ' + google_location.address.region + ', ' + google_location.address.country + ' (' + google_location.address.country_code + ')';
+}
+else {
+  google_html = 'Google location was not set.';
+}
+document.getElementById('google').innerHTML = google_html;
+
+getPosition(function(err, position) {
+  document.getElementById('browser').innerHTML = err ?
+    'Could not get current position of user. ' + err.toString() :
+    'Got current position of user: ' + JSON.stringify(position);
+});
+</script>
+

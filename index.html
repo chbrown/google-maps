@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Google Maps Layers</title>
+<style type="text/css">
+html {
+  height: 100%;
+}
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial;
+  font-weight: 200;
+
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin: 0.25em 0 0.5em;
+}
+#map {
+  height: 100%;
+}
+.map-container {
+  margin: 10px;
+  border: 1px solid #bbb;
+  background-color: #ddd;
+  height: 70%;
+}
+.control {
+  margin: 10px;
+  float: left;
+}
+table {
+  border-collapse: collapse;
+}
+th, td {
+  padding: 0 4px 2px 0;
+  vertical-align: top;
+  font-size: 90%;
+}
+th {
+  padding: 0 8px 2px 0;
+  text-align: left;
+  font-weight: bold;
+}
+</style>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCDYwRP0wOSFFgzJDr73JtketDW335C234&sensor=true"></script>
+<script src="lib/underscore.min.js"></script>
+<script src="lib/jquery.min.js"></script>
+<script src="lib/backbone.min.js"></script>
+<script src="google-maps.js"></script>
+<script>
+var down = (new KeyState()).down;
+
+// Backbone.sync = function(method, model, options) {};
+
+// All GeoJSON is (lon, lat), opposite of Google.
+
+var Feature = Backbone.Model.extend({
+  // has fields: type, geometry, properties
+  toJSON: function() {
+    return _.extend({type: "feature"}, this.attributes);
+  },
+  toString: function() {
+    return this.get('geometry').toString();
+  },
+  parse: function(response, options) {
+    // have to type-boost to get a versatile Backbone model
+    // var Geometry = Geometries[response.geometry.type];
+    response.geometry = new Geometries[response.geometry.type](response.geometry);
+    return response;
+  }
+});
+
+var FeatureCollection = Backbone.Collection.extend({
+  model: Feature,
+  initialize: function(opts) {
+    if (localStorage.features) {
+      this.reset(JSON.parse(localStorage.features), {parse: true});
+    }
+
+    this.on('add', function() {
+      this.persist();
+      this.render();
+    }, this);
+
+    this.render();
+  },
+  render: function() {
+    var $feature_list = $('#feature_list').empty();
+    this.each(function(feature) {
+      $feature_list.append('<div>' + feature.toString() + '</div>');
+    });
+  },
+  persist: function() {
+    localStorage.features = JSON.stringify(this.toJSON());
+  }
+});
+
+var Geometries = {
+  Polygon: Backbone.Model.extend({
+    toJSON: function() {
+      return _.extend({type: 'Polygon', coordinates: this.get('coordinates')});
+    },
+    toString: function() {
+      return [this.sw().join(','), this.ne().join(',')].join(',');
+    },
+    sw: function() {
+      // returns [longitude, latitude]
+      // coordinates = [[lon, lat], [lon, lat], [lon, lat], [lon, lat], ...]
+      var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
+      // longitudes_latitudes = [[lon, lon, lon, ...], [lat, lat, lat, ...]]
+      return [_.min(longitudes_latitudes[0]), _.min(longitudes_latitudes[1])];
+    },
+    ne: function() {
+      // returns [longitude, latitude]
+      var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
+      return [_.max(longitudes_latitudes[0]), _.max(longitudes_latitudes[1])];
+    },
+    attach: function(map) {
+      var sw = this.sw();
+      var ne = this.ne();
+      // assume all Polygons are Rectangles, for now.
+      this.view = new google.maps.Rectangle({
+        // LatLngBounds(sw?:LatLng, ne?:LatLng)
+        bounds: new google.maps.LatLngBounds(
+          new google.maps.LatLng(sw[1], sw[0]),
+          new google.maps.LatLng(ne[1], ne[0])
+        ),
+        clickable: false,
+        map: map
+        // strokeColor: '#FF0000',
+        // strokeOpacity: 0.8,
+        // strokeWeight: 2,
+        // fillColor: '#FF0000',
+        // fillOpacity: 0.35
+      });
+      return this;
+    }
+  }),
+  Point: Backbone.Model.extend({
+    toJSON: function() {
+      return _.extend({type: 'Point', coordinates: this.get('coordinates')});
+    },
+    toString: function() {
+      return this.get('coordinates').join(',');
+    },
+    attach: function(map) {
+      var coordinates = this.get('coordinates');
+      this.view = new google.maps.Marker({
+        // GeoJSON is [longitude, latitude]
+        position: new google.maps.LatLng(coordinates[1], coordinates[0]),
+        clickable: false,
+        map: map
+      });
+      return this;
+    }
+  })
+};
+
+
+var features = new FeatureCollection();
+var temporary_rectangle = null;
+var mousedown_latLng = null;
+
+$(function() {
+
+  var $map = $('#map');
+  var map = new google.maps.Map($map.get(0), {
+    zoom: 8,
+    center: new google.maps.LatLng(41.8831, -87.6219), // Millenium Park, Chicago, IL
+    mapTypeId: google.maps.MapTypeId.ROADMAP
+  });
+  features.each(function(feature) {
+    feature.get('geometry').attach(map);
+  });
+
+  getPosition(function(err, position) {
+    if (err) {
+      console.error('Could not get user position: ' + err.toString());
+    }
+    else {
+      var latlng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+      map.setCenter(latlng);
+      map.setZoom(16);
+    }
+  });
+
+  window.map = map;
+
+  // freeze the map on shift (which == 16)
+  $(window).on('keydown', function(ev) {
+    if (ev.which == 16) {
+      map.setOptions(opts_frozen);
+      $map.css({opacity: .7});
+    }
+  });
+  $(window).on('keyup', function(ev) {
+    if (ev.which == 16) {
+      map.setOptions(opts_interactive);
+      $map.css({opacity: .99});
+    }
+  });
+
+
+  map.addListener('mousedown', function(ev) {
+    mousedown_latLng = ev.latLng;
+    if (down[16]) { // shift-down
+      temporary_rectangle = new google.maps.Rectangle({
+        bounds: new google.maps.LatLngBounds(ev.latLng, ev.latLng),
+        clickable: false,
+        map: map
+        // strokeColor: '#FF0000',
+        // strokeOpacity: 0.8,
+        // strokeWeight: 2,
+        // fillColor: '#FF0000',
+        // fillOpacity: 0.35
+      });
+    }
+    // ev.stop() does nothing
+  });
+  map.addListener('mousemove', function(ev) {
+    $('#mouse_latitude').text(ev.latLng.lat().toFixed(8));
+    $('#mouse_longitude').text(ev.latLng.lng().toFixed(8));
+
+    if (temporary_rectangle && down[16]) { // shift-down
+      var initial_bounds = new google.maps.LatLngBounds(mousedown_latLng, mousedown_latLng);
+      temporary_rectangle.setBounds(initial_bounds.extend(ev.latLng));
+      // "lat_lo,lng_lo,lat_hi,lng_hi"
+    }
+  });
+  map.addListener('mouseup', function(ev) {
+    var geometry = null;
+    if (temporary_rectangle) {
+      var bounds = temporary_rectangle.getBounds();
+      var sw = bounds.getSouthWest();
+      var ne = bounds.getNorthEast();
+      temporary_rectangle.setMap(null);
+      geometry = new Geometries.Polygon({
+        coordinates: [
+          // [[longitude, latitude], ... ]
+          // longitude is negative to the west, positive to the east
+          // latitude is positive north, negative south
+          [sw.lng(), ne.lat()], // nw
+          [ne.lng(), ne.lat()], // ne
+          [ne.lng(), sw.lat()], // se
+          [sw.lng(), sw.lat()], // sw
+        ]
+      });
+    }
+    else {
+      geometry = new Geometries.Point({
+        coordinates: [ev.latLng.lng(), ev.latLng.lat()]
+      });
+    }
+    geometry.attach(map);
+    features.add(new Feature({geometry: geometry}));
+  });
+
+  $('#clear').click(function() {
+    localStorage.features = JSON.stringify([]);
+    window.location = window.location;
+  });
+
+});
+</script>
+
+<body>
+  <div class="map-container">
+    <div id="map"></div>
+  </div>
+  <div class="control">
+    <h3>Google Maps</h3>
+    <p>Hold <code>shift</code> to draw.</p>
+  </div>
+  <div class="control" style="min-width: 200px;">
+    <h3>Mouse Coordinates</h3>
+    <table>
+      <tr>
+        <th>Latitude</th>
+        <td id="mouse_latitude"></td>
+      </tr>
+      <tr>
+        <th>Longitude</th>
+        <td id="mouse_longitude"></td>
+      </tr>
+    </table>
+  </div>
+  <div class="control">
+    <h3>Features</h3>
+    <div id="feature_list">
+    </div>
+    <button id="clear">Clear</button>
+  </div>
+</body>
