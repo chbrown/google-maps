@@ -1,6 +1,8 @@
-# google-maps
+## google-maps
 
-[chbrown.github.io/google-maps/](http://chbrown.github.io/google-maps/)
+Tools for doing things with the Google API more quickly and/or easily than with plain Google Maps.
+
+### [chbrown.github.io/google-maps/](http://chbrown.github.io/google-maps/)
 
 Features:
 
@@ -10,11 +12,7 @@ Features:
     * This is what Twitter's streaming API requires, for example.
 4. Search. Uses Google's Geocoder to navigate to new places quickly, Automatically saving them as features.
 
-## API
-
-Google API Key:
-
-    AIzaSyCDYwRP0wOSFFgzJDr73JtketDW335C234
+<!--- Google API Key: AIzaSyCDYwRP0wOSFFgzJDr73JtketDW335C234 -->
 
 ## Links
 
