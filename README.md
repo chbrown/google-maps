@@ -1,6 +1,6 @@
 # google-maps
 
-## [chbrown.github.io/google-maps/](http://chbrown.github.io/google-maps/)
+[chbrown.github.io/google-maps/](http://chbrown.github.io/google-maps/)
 
 Features:
 
