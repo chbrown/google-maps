@@ -17,6 +17,9 @@ body {
 h1, h2, h3, h4, h5, h6 {
   margin: 0.25em 0 0.5em;
 }
+p {
+  margin: 0.5em 0;
+}
 #map {
   height: 100%;
 }
@@ -37,10 +40,20 @@ th, td {
   padding: 0 4px 2px 0;
   vertical-align: top;
   font-size: 90%;
+  white-space: nowrap;
 }
 th {
   padding: 0 8px 2px 0;
   text-align: left;
+  font-weight: bold;
+}
+table.features tr {
+  cursor: normal;
+}
+table.features tr td {
+  padding: 2px 8px 2px 0;
+}
+label span {
   font-weight: bold;
 }
 </style>
@@ -67,9 +80,44 @@ var Feature = Backbone.Model.extend({
   },
   parse: function(response, options) {
     // have to type-boost to get a versatile Backbone model
-    // var Geometry = Geometries[response.geometry.type];
     response.geometry = new Geometries[response.geometry.type](response.geometry);
     return response;
+  }
+});
+
+var FeatureView = Backbone.View.extend({
+  tagName: 'tr',
+  templateString: '<td><%= type %></td>\
+    <td><%= coordinates %></td>\
+    <td><%= label %></td>',
+  initialize: function(opts) {
+    this.map = opts.map;
+    this.render();
+  },
+  render: function() {
+    var properties = this.model.get('properties') || {};
+    var html = _.template(this.templateString, {
+      type: this.model.get('geometry').get('type'),
+      coordinates: this.model.toString(),
+      label: properties.label
+    });
+    this.$el.append(html);
+    this.shape = this.model.get('geometry').googleShape(this.map);
+  },
+  events: {
+    'mouseover': function(ev) {
+      this.model.get('geometry').get('type');
+      // center always returns a lon,lat pair.
+    },
+    'click': function(ev) {
+      if (down[16]) { // shift-down
+        this.model.collection.remove(this.model);
+        this.remove();
+      }
+      else {
+        this.model.get('geometry').focus(this.map);
+      }
+    }
   }
 });
 
@@ -80,19 +128,7 @@ var FeatureCollection = Backbone.Collection.extend({
       this.reset(JSON.parse(localStorage.features), {parse: true});
     }
 
-    this.on('add', function() {
-      this.persist();
-      this.render();
-    }, this);
-
-    this.render();
-  },
-  render: function() {
-    console.log("Rendering with", this.length);
-    var $feature_list = $('#feature_list').empty();
-    this.each(function(feature) {
-      $feature_list.append('<div>' + feature.toString() + '</div>');
-    });
+    this.on('add remove reset', this.persist, this);
   },
   persist: function() {
     localStorage.features = JSON.stringify(this.toJSON());
@@ -101,9 +137,12 @@ var FeatureCollection = Backbone.Collection.extend({
 
 var Geometries = {
   Polygon: Backbone.Model.extend({
-    toJSON: function() {
-      return _.extend({type: 'Polygon', coordinates: this.get('coordinates')});
+    initialize: function(opts) {
+      this.set('type', 'Polygon');
     },
+    // toJSON: function() {
+    //   return _.extend({type: 'Polygon', coordinates: this.get('coordinates')});
+    // },
     toString: function() {
       var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
       return [
@@ -113,27 +152,30 @@ var Geometries = {
         _.max(longitudes_latitudes[1]).toFixed(4)
       ].join(',');
     },
-    sw: function() {
-      // returns [longitude, latitude]
-      // coordinates = [[lon, lat], [lon, lat], [lon, lat], [lon, lat], ...]
-      var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
-      // longitudes_latitudes = [[lon, lon, lon, ...], [lat, lat, lat, ...]]
-      return [_.min(longitudes_latitudes[0]), _.min(longitudes_latitudes[1])];
+    // sw: function() {
+    //   // returns [longitude, latitude]
+    //   // coordinates = [[lon, lat], [lon, lat], [lon, lat], [lon, lat], ...]
+    //   var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
+    //   // longitudes_latitudes = [[lon, lon, lon, ...], [lat, lat, lat, ...]]
+    //   return [_.min(longitudes_latitudes[0]), _.min(longitudes_latitudes[1])];
+    // },
+    // ne: function() {
+    //   // returns [longitude, latitude]
+    //   var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
+    //   return [_.max(longitudes_latitudes[0]), _.max(longitudes_latitudes[1])];
+    // },
+    focus: function(map) {
+      map.fitBounds(this.googleShape().getBounds());
     },
-    ne: function() {
-      // returns [longitude, latitude]
+    googleShape: function(map) {
       var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
-      return [_.max(longitudes_latitudes[0]), _.max(longitudes_latitudes[1])];
-    },
-    attach: function(map) {
-      var sw = this.sw();
-      var ne = this.ne();
+      // center always returns a lon,lat pair.
       // assume all Polygons are Rectangles, for now.
-      this.view = new google.maps.Rectangle({
+      return new google.maps.Rectangle({
         // LatLngBounds(sw?:LatLng, ne?:LatLng)
         bounds: new google.maps.LatLngBounds(
-          new google.maps.LatLng(sw[1], sw[0]),
-          new google.maps.LatLng(ne[1], ne[0])
+          new google.maps.LatLng(_.min(longitudes_latitudes[1]), _.min(longitudes_latitudes[0])),
+          new google.maps.LatLng(_.max(longitudes_latitudes[1]), _.max(longitudes_latitudes[0]))
         ),
         clickable: false,
         map: map
@@ -143,13 +185,15 @@ var Geometries = {
         // fillColor: '#FF0000',
         // fillOpacity: 0.35
       });
-      return this;
     }
   }),
   Point: Backbone.Model.extend({
-    toJSON: function() {
-      return _.extend({type: 'Point', coordinates: this.get('coordinates')});
+    initialize: function(opts) {
+      this.set('type', 'Point');
     },
+    // toJSON: function() {
+    //   return _.extend({type: 'Point', coordinates: this.get('coordinates')});
+    // },
     toString: function() {
       var coordinates = this.get('coordinates');
       return [
@@ -157,15 +201,18 @@ var Geometries = {
         coordinates[1].toFixed(4)
       ].join(',');
     },
-    attach: function(map) {
+    focus: function(map) {
+      var center = this.googleShape().getPosition();
+      map.setCenter(center);
+    },
+    googleShape: function(map) {
       var coordinates = this.get('coordinates');
-      this.view = new google.maps.Marker({
+      return new google.maps.Marker({
         // GeoJSON is [longitude, latitude]
         position: new google.maps.LatLng(coordinates[1], coordinates[0]),
         clickable: false,
         map: map
       });
-      return this;
     }
   })
 };
@@ -173,6 +220,8 @@ var Geometries = {
 
 var temporary_rectangle = null;
 var mousedown_latLng = null;
+var geocoder = new google.maps.Geocoder();
+var dragging = false;
 
 $(function() {
 
@@ -184,8 +233,14 @@ $(function() {
     center: new google.maps.LatLng(41.8831, -87.6219), // Millenium Park, Chicago, IL
     mapTypeId: google.maps.MapTypeId.ROADMAP
   });
+
+  map.setOptions(opts_interactive);
+  // eavesdrop(map, google_map_events);
+
+  var $features = $('table.features tbody');
   features.each(function(feature) {
-    feature.get('geometry').attach(map);
+    var feature_view = new FeatureView({model: feature, map: map});
+    $features.append(feature_view.el);
   });
 
   getPosition(function(err, position) {
@@ -193,13 +248,11 @@ $(function() {
       console.error('Could not get user position: ' + err.toString());
     }
     else {
-      var latlng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
-      map.setCenter(latlng);
+      var center = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+      map.setCenter(center);
       map.setZoom(16);
     }
   });
-
-  window.map = map;
 
   // freeze the map on shift (which == 16)
   $(window).on('keydown', function(ev) {
@@ -262,18 +315,71 @@ $(function() {
         ]
       });
     }
-    else {
+    else if (!dragging) {
       geometry = new Geometries.Point({
         coordinates: [ev.latLng.lng(), ev.latLng.lat()]
       });
     }
-    geometry.attach(map);
-    features.add(new Feature({geometry: geometry}));
+
+    if (geometry) {
+      // cut off the day of the week, then capture until the timezone
+      var label = new Date().toString().match(/^\w+ (.+) GMT/)[1];
+      var feature = new Feature({
+        geometry: geometry,
+        properties: {label: label}
+      });
+      features.add(feature);
+
+      var feature_view = new FeatureView({model: feature, map: map});
+      $features.append(feature_view.el);
+    }
   });
+  map.addListener('dragstart', function() {dragging = true;});
+  map.addListener('dragend', function() {dragging = false;});
 
   $('#clear').click(function() {
-    localStorage.features = JSON.stringify([]);
-    window.location = window.location;
+    features.reset();
+    features.persist();
+    $features.empty();
+  });
+
+  $('form').on('submit', function(ev, b) {
+    var query = $(ev.target).find('input').val();
+    ev.preventDefault();
+
+    geocoder.geocode({address: query}, function(results, status) {
+      if (status == google.maps.GeocoderStatus.OK) {
+        var result = results[0];
+        console.log('Search found', result);
+        map.fitBounds(result.geometry.bounds);
+
+        var sw = result.geometry.bounds.getSouthWest();
+        var ne = result.geometry.bounds.getNorthEast();
+
+        var feature = new Feature({
+          geometry: new Geometries.Polygon({
+            coordinates: [
+              [sw.lng(), ne.lat()], // nw
+              [ne.lng(), ne.lat()], // ne
+              [ne.lng(), sw.lat()], // se
+              [sw.lng(), sw.lat()], // sw
+            ]
+          }),
+          properties: {
+            label: result.formatted_address
+          }
+        });
+
+        features.add(feature);
+        var feature_view = new FeatureView({model: feature, map: map});
+        $features.append(feature_view.el);
+
+        $('#search_results').html(result.formatted_address);
+      }
+      else {
+        $('#search_results').html('Geocoder failed. ' + status.toString());
+      }
+    });
   });
 
 });
@@ -283,11 +389,17 @@ $(function() {
   <div class="map-container">
     <div id="map"></div>
   </div>
-  <div class="control">
+  <div class="control" style="width: 200px;">
     <h3>Google Maps</h3>
     <p>Hold <code>shift</code> to draw.</p>
+    <form>
+      <h4>Search</h4>
+      <input name="query" />
+      <button type="submit">Search</button>
+    </form>
+    <p id="search_results"></p>
   </div>
-  <div class="control" style="min-width: 200px;">
+  <div class="control" style="width: 200px;">
     <h3>Mouse Coordinates</h3>
     <table>
       <tr>
@@ -302,8 +414,10 @@ $(function() {
   </div>
   <div class="control">
     <h3>Features</h3>
-    <div id="feature_list">
-    </div>
-    <button id="clear">Clear</button>
+    <table class="features">
+      <tbody></tbody>
+    </table>
+    <button id="clear" style="margin: 10px 0">Clear</button>
   </div>
+  <div style="clear: both">&nbsp;</div>
 </body>

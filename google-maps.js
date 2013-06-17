@@ -65,5 +65,3 @@ function eavesdrop(emitter, events) {
     });
   });
 }
-// eavesdrop(map, google_map_events);
-
