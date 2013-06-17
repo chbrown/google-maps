@@ -36,16 +36,11 @@ p {
 table {
   border-collapse: collapse;
 }
-th, td {
-  padding: 0 4px 2px 0;
+td {
+  padding: 0 8px 2px 0;
   vertical-align: top;
   font-size: 90%;
   white-space: nowrap;
-}
-th {
-  padding: 0 8px 2px 0;
-  text-align: left;
-  font-weight: bold;
 }
 table.features tr {
   cursor: normal;
@@ -226,35 +221,38 @@ var mousedown_latLng = null;
 var geocoder = new google.maps.Geocoder();
 var dragging = false;
 
+function parseLatLng(s) {
+  var lat_lon_pair = s.split(/,/);
+  return new google.maps.LatLng(lat_lon_pair[0], lat_lon_pair[1]);
+}
+
 $(function() {
 
   var features = new FeatureCollection();
 
   var $map = $('#map');
+
+  var center = parseInt(localStorage.zoom || 8);
+
   var map = new google.maps.Map($map.get(0), {
-    zoom: 8,
-    center: new google.maps.LatLng(41.8831, -87.6219), // Millenium Park, Chicago, IL
+    zoom: parseInt(localStorage.zoom || 8, 10),
+    center: parseLatLng(localStorage.center || '41.8831,-87.6219'), // Millenium Park, Chicago, IL
     mapTypeId: google.maps.MapTypeId.ROADMAP
   });
-
+  map.addListener('center_changed', function() {
+    localStorage.center = map.getCenter().toUrlValue();
+  })
+  map.addListener('zoom_changed', function() {
+    localStorage.zoom = map.getZoom();
+  })
   map.setOptions(opts_interactive);
+
   // eavesdrop(map, google_map_events);
 
   var $features = $('table.features tbody');
   features.each(function(feature) {
     var feature_view = new FeatureView({model: feature, map: map});
     $features.append(feature_view.el);
-  });
-
-  getPosition(function(err, position) {
-    if (err) {
-      console.error('Could not get user position: ' + err.toString());
-    }
-    else {
-      var center = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
-      map.setCenter(center);
-      map.setZoom(16);
-    }
   });
 
   // freeze the map on shift (which == 16)
@@ -331,6 +329,19 @@ $(function() {
     $features.empty();
   });
 
+  $('#me').click(function() {
+    getPosition(function(err, position) {
+      if (err) {
+        console.error('Could not get user position: ' + err.toString());
+      }
+      else {
+        var center = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+        map.setCenter(center);
+        map.setZoom(16);
+      }
+    });
+  });
+
   $('form').on('submit', function(ev, b) {
     var query = $(ev.target).find('input').val();
     ev.preventDefault();
@@ -374,35 +385,40 @@ $(function() {
   <div class="map-container">
     <div id="map"></div>
   </div>
-  <div class="control" style="width: 200px;">
-    <h3>Google Maps</h3>
-    <p>Hold <code>shift</code> to draw.</p>
+
+  <div class="control" style="width: 230px;">
+    <button id="me" style="margin: 0 0 10px 0">Geolocate me</button>
+
+    <h3>Mouse Coordinates</h3>
+    <table>
+      <tr>
+        <td>Latitude</td>
+        <td id="mouse_latitude"></td>
+      </tr>
+      <tr>
+        <td>Longitude</td>
+        <td id="mouse_longitude"></td>
+      </tr>
+    </table>
+
+    <h3>Search</h3>
     <form>
-      <h4>Search</h4>
       <input name="query" />
       <button type="submit">Search</button>
     </form>
     <p id="search_results"></p>
   </div>
-  <div class="control" style="width: 200px;">
-    <h3>Mouse Coordinates</h3>
-    <table>
-      <tr>
-        <th>Latitude</th>
-        <td id="mouse_latitude"></td>
-      </tr>
-      <tr>
-        <th>Longitude</th>
-        <td id="mouse_longitude"></td>
-      </tr>
-    </table>
-  </div>
+
   <div class="control">
+    <p>Hold <code>shift</code> to draw on the map.</p>
     <h3>Features</h3>
     <table class="features">
       <tbody></tbody>
     </table>
-    <button id="clear" style="margin: 10px 0">Clear</button>
+    <p><code>shift</code>+click to delete individual features</p>
+    <button id="clear" style="margin: 10px 0">Clear all features</button>
   </div>
+
   <div style="clear: both">&nbsp;</div>
+
 </body>
