@@ -88,6 +88,7 @@ var FeatureCollection = Backbone.Collection.extend({
     this.render();
   },
   render: function() {
+    console.log("Rendering with", this.length);
     var $feature_list = $('#feature_list').empty();
     this.each(function(feature) {
       $feature_list.append('<div>' + feature.toString() + '</div>');
@@ -104,7 +105,13 @@ var Geometries = {
       return _.extend({type: 'Polygon', coordinates: this.get('coordinates')});
     },
     toString: function() {
-      return [this.sw().join(','), this.ne().join(',')].join(',');
+      var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
+      return [
+        _.min(longitudes_latitudes[0]).toFixed(4),
+        _.min(longitudes_latitudes[1]).toFixed(4),
+        _.max(longitudes_latitudes[0]).toFixed(4),
+        _.max(longitudes_latitudes[1]).toFixed(4)
+      ].join(',');
     },
     sw: function() {
       // returns [longitude, latitude]
@@ -144,7 +151,11 @@ var Geometries = {
       return _.extend({type: 'Point', coordinates: this.get('coordinates')});
     },
     toString: function() {
-      return this.get('coordinates').join(',');
+      var coordinates = this.get('coordinates');
+      return [
+        coordinates[0].toFixed(4),
+        coordinates[1].toFixed(4)
+      ].join(',');
     },
     attach: function(map) {
       var coordinates = this.get('coordinates');
@@ -160,11 +171,12 @@ var Geometries = {
 };
 
 
-var features = new FeatureCollection();
 var temporary_rectangle = null;
 var mousedown_latLng = null;
 
 $(function() {
+
+  var features = new FeatureCollection();
 
   var $map = $('#map');
   var map = new google.maps.Map($map.get(0), {
@@ -237,6 +249,7 @@ $(function() {
       var sw = bounds.getSouthWest();
       var ne = bounds.getNorthEast();
       temporary_rectangle.setMap(null);
+      temporary_rectangle = null;
       geometry = new Geometries.Polygon({
         coordinates: [
           // [[longitude, latitude], ... ]
