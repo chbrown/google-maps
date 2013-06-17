@@ -1,3 +1,15 @@
+# google-maps
+
+## [chbrown.github.io/google-maps/](http://chbrown.github.io/google-maps/)
+
+Features:
+
+1. Memory. Current map `center` and `zoom` level persist across page loads.
+2. Stateful. Saves queries, drawn shapes, and marked points.
+3. Standard. GeoJSON: all coordinates are given in (longitude, latitude) pairs.
+    * This is what Twitter's streaming API requires, for example.
+4. Search. Uses Google's Geocoder to navigate to new places quickly, Automatically saving them as features.
+
 ## API
 
 Google API Key:
