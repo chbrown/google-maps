@@ -9,6 +9,8 @@ Google API Key:
 Sources
 
 * https://developers.google.com/maps/documentation/javascript/
+    * https://developers.google.com/maps/documentation/javascript/reference
+    * https://developers.google.com/maps/documentation/javascript/examples/drawing-tools
 * http://mapscripting.com/how-to-use-geolocation-in-mobile-safari
 
 Alternatives
