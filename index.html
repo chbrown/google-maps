@@ -6,7 +6,7 @@ html {
   height: 100%;
 }
 body {
-  font-family: "Helvetica Neue", Helvetica, Arial;
+  font-family: 'Helvetica Neue', Helvetica, Arial;
   font-weight: 200;
 
   height: 100%;
@@ -20,9 +20,10 @@ h1, h2, h3, h4, h5, h6 {
 p {
   margin: 0.5em 0;
 }
-#map {
-  height: 100%;
+label span {
+  font-weight: bold;
 }
+
 .map-container {
   margin: 10px;
   border: 1px solid #bbb;
@@ -42,33 +43,56 @@ td {
   font-size: 90%;
   white-space: nowrap;
 }
-table.features tr {
+.features tr {
   cursor: normal;
 }
-table.features tr td {
+.features td {
   padding: 2px 8px 2px 0;
 }
-label span {
-  font-weight: bold;
+button {
+  margin: 10px 0;
+}
+textarea {
+  display: block;
+  width: 640px;
 }
 </style>
+<script type="text/template" id="FeatureCollectionView">
+  <h3>Features</h3>
+  <table>
+    <tbody>
+    </tbody>
+  </table>
+  <p><code>shift</code>+click to delete individual features</p>
+  <button name="clear">Clear all features</button>
+  <button name="edit">Edit GeoJSON</button>
+</script>
+<script type="text/template" id="FeatureCollectionEdit">
+  <textarea><%= json %></textarea>
+  <button name="save">Save</button>
+</script>
+<script type="text/template" id="FeatureView">
+  <td><%= type %></td>
+  <td><%= coordinates %></td>
+  <td><%= label %></td>
+</script>
+
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCDYwRP0wOSFFgzJDr73JtketDW335C234&sensor=true"></script>
 <script src="lib/underscore.min.js"></script>
 <script src="lib/jquery.min.js"></script>
 <script src="lib/backbone.min.js"></script>
+<script src="jquery.flexibleArea.js"></script>
 <script src="google-maps.js"></script>
 <script>
+"use strict"; /*jslint indent: 2 */ /*globals $ */
 var down = (new KeyState()).down;
 
-// Backbone.sync = function(method, model, options) {};
-
-// All GeoJSON is (lon, lat), opposite of Google.
-
+// All GeoJSON is (lon, lat), opposite of Google (GOOG uses latLng pairs)
 var Feature = Backbone.Model.extend({
   // has fields: type, geometry, properties
   toJSON: function() {
-    return _.extend({type: "feature"}, this.attributes);
+    return _.extend({type: 'feature'}, this.attributes);
   },
   toString: function() {
     return this.get('geometry').toString();
@@ -80,32 +104,81 @@ var Feature = Backbone.Model.extend({
   }
 });
 
+var FeatureCollectionView = Backbone.View.extend({
+  initialize: function(opts) {
+    this.map = opts.map;
+    this.render();
+  },
+  render: function() {
+    var self = this;
+    var html = _.template($('#FeatureCollectionView').html(), {});
+    this.$el.html(html);
+    this.collection.each(function(feature) {
+      var feature_view = new FeatureView({model: feature, map: self.map});
+      self.$('tbody').append(feature_view.el);
+    });
+  },
+  events: {
+    'click button[name="clear"]': function(ev) {
+      this.collection.reset();
+      this.render();
+    },
+    'click button[name="edit"]': function(ev) {
+      var replacement = new FeatureCollectionEdit({collection: this.collection, map: this.map});
+      this.$el.replaceWith(replacement.el);
+    }
+  }
+});
+
+var FeatureCollectionEdit = Backbone.View.extend({
+  initialize: function(opts) {
+    this.map = opts.map;
+    this.render();
+  },
+  render: function() {
+    var html = _.template($('#FeatureCollectionEdit').html(), {
+      json: JSON.stringify(this.collection, null, '  '),
+    });
+    this.$el.html(html);
+
+    var self = this;
+    setTimeout(function() {
+      self.$('textarea').flexible();
+    }, 50);
+  },
+  events: {
+    'click button[name="save"]': function(ev) {
+      var json_string = this.$('textarea').val();
+      this.collection.reset(JSON.parse(json_string), {parse: true});
+      var replacement = new FeatureCollectionView({collection: this.collection, map: this.map});
+      this.$el.replaceWith(replacement.el);
+    }
+  }
+});
+
 var FeatureView = Backbone.View.extend({
   tagName: 'tr',
-  templateString: '<td><%= type %></td>\
-    <td><%= coordinates %></td>\
-    <td><%= label %></td>',
   initialize: function(opts) {
     this.map = opts.map;
     this.render();
   },
   render: function() {
     var properties = this.model.get('properties') || {};
-    var html = _.template(this.templateString, {
+    var html = _.template($('#FeatureView').html(), {
       type: this.model.get('geometry').get('type'),
       coordinates: this.model.toString(),
       label: properties.label
     });
-    this.$el.append(html);
+    this.$el.html(html);
     this.shape = this.model.get('geometry').googleShape(this.map);
   },
   events: {
-    'mouseover': function(ev) {
+    mouseover: function(ev) {
       this.model.get('geometry').get('type');
       // center always returns a lon,lat pair.
     },
-    'click': function(ev) {
-      if (down[16]) { // shift-down
+    click: function(ev) {
+      if (down[16]) { // 16 = shift key
         this.model.collection.remove(this.model);
         this.remove();
       }
@@ -227,7 +300,6 @@ function parseLatLng(s) {
 }
 
 $(function() {
-
   var features = new FeatureCollection();
 
   var $map = $('#map');
@@ -249,11 +321,8 @@ $(function() {
 
   // eavesdrop(map, google_map_events);
 
-  var $features = $('table.features tbody');
-  features.each(function(feature) {
-    var feature_view = new FeatureView({model: feature, map: map});
-    $features.append(feature_view.el);
-  });
+  var features_view = new FeatureCollectionView({collection: features, map: map});
+  $('#features').append(features_view.el);
 
   // freeze the map on shift (which == 16)
   $(window).on('keydown', function(ev) {
@@ -293,7 +362,7 @@ $(function() {
     if (temporary_rectangle && down[16]) { // shift-down
       var initial_bounds = new google.maps.LatLngBounds(mousedown_latLng, mousedown_latLng);
       temporary_rectangle.setBounds(initial_bounds.extend(ev.latLng));
-      // "lat_lo,lng_lo,lat_hi,lng_hi"
+      // 'lat_lo,lng_lo,lat_hi,lng_hi'
     }
   });
   map.addListener('mouseup', function(ev) {
@@ -315,19 +384,10 @@ $(function() {
         properties: {label: label}
       });
       features.add(feature);
-
-      var feature_view = new FeatureView({model: feature, map: map});
-      $features.append(feature_view.el);
     }
   });
   map.addListener('dragstart', function() {dragging = true;});
   map.addListener('dragend', function() {dragging = false;});
-
-  $('#clear').click(function() {
-    features.reset();
-    features.persist();
-    $features.empty();
-  });
 
   $('#me').click(function() {
     getPosition(function(err, position) {
@@ -383,11 +443,11 @@ $(function() {
 
 <body>
   <div class="map-container">
-    <div id="map"></div>
+    <div style="height: 100%;" id="map"></div>
   </div>
 
   <div class="control" style="width: 230px;">
-    <button id="me" style="margin: 0 0 10px 0">Geolocate me</button>
+    <button id="me">Geolocate me</button>
 
     <h3>Mouse Coordinates</h3>
     <table>
@@ -411,12 +471,7 @@ $(function() {
 
   <div class="control">
     <p>Hold <code>shift</code> to draw on the map.</p>
-    <h3>Features</h3>
-    <table class="features">
-      <tbody></tbody>
-    </table>
-    <p><code>shift</code>+click to delete individual features</p>
-    <button id="clear" style="margin: 10px 0">Clear all features</button>
+    <div id="features"></div>
   </div>
 
   <div style="clear: both">&nbsp;</div>
