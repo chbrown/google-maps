@@ -190,7 +190,7 @@ $(function() {
 
         var label = 'Location on ' + new Date().toString().match(/^\w+ (.+) GMT/)[1];
         var feature = new Feature({
-          geometry: Point.fromLatLng(ev.latLng),
+          geometry: Point.fromLatLng(center),
           properties: {label: label}
         });
         features.add(feature);
