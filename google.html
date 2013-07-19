@@ -1,7 +1,21 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <title>Google Maps Geometry</title>
-<link href="google.css" rel="stylesheet" type="text/css" media="all" />
+<link href="maps.css" rel="stylesheet" type="text/css" media="all" />
+<style>
+.map-container {
+  margin: 10px;
+  border: 1px solid #bbb;
+  background-color: #ddd;
+  height: 70%;
+}
+.features tr {
+  cursor: normal;
+}
+.features td {
+  padding: 2px 8px 2px 0;
+}
+</style>
 
 <!-- development link: http://ghkl/maps/google.html -->
 
@@ -35,7 +49,7 @@
   <button name="edit">Edit GeoJSON</button>
 </script>
 <script type="text/template" id="FeaturesEditor">
-  <textarea><%= json %></textarea>
+  <textarea style="width: 640px"><%= json %></textarea>
   <button name="save">Save</button>
 </script>
 <script type="text/template" id="FeatureRow">
