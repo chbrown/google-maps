@@ -1,30 +1,48 @@
 <!DOCTYPE html>
-<html>
-<title>Simple Geolocation with Google vs. Browser</title>
-<script src="https://www.google.com/jsapi"></script>
-<script src="google-maps.js"></script>
-<dl>
-  <dt>navigator.geolocation.getCurrentPosition (browser)
-    <dd><span id="browser"></span>
-  <dt>google.loader.ClientLocation (Google)
-    <dd><span id="google"></span>
-</dl>
+<head>
+  <title>Google maps vs. built-in browser geolocation</title>
+  <script src="lib/angular.js"></script>
+  <script src="https://www.google.com/jsapi"></script>
+  <!-- development: http://ghkl/maps/locators.html -->
+  <!-- production: http://chbrown.github.io/maps/locators.html -->
+  <script>
+  /*jslint browser: true */ /*globals angular, google */
+  angular.module('app', []).controller('ctrl', function($scope) {
+    // load google
+    $scope.google = google.loader.ClientLocation;
+    // load browser
+    $scope.browser = null;
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      $scope.$apply(function() {
+        $scope.browser = {position: pos};
+      });
+    }, function(err) {
+      $scope.$apply(function() {
+        $scope.browser = {error: err};
+      });
+    });
+  });
+  </script>
+</head>
+<body ng-app="app" ng-controller="ctrl">
+  <h2>navigator.geolocation.getCurrentPosition</h2>
+  <div ng-hide="browser">Asking for current position...</div>
+  <div ng-if="browser">
+    <div ng-show="browser.error">
+      <h3>Failed to get current position</h3>
+      <pre>{{ browser.error | json }}</pre>
+    </div>
+    <div ng-show="browser.position">
+      <h3>Found current position</h3>
+      <pre>{{ browser.position | json:'  ' }}</pre>
+    </div>
+  </div>
 
-<script>
-var google_html = 'Not set';
-var google_location = google.loader.ClientLocation;
-if (google_location) {
-  google_html = 'Lat/Lon: ' + google_location.latitude + ' / ' + google_location.longitude + ' &middot; Location: ' + google_location.address.city + ', ' + google_location.address.region + ', ' + google_location.address.country + ' (' + google_location.address.country_code + ')';
-}
-else {
-  google_html = 'Google location was not set.';
-}
-document.getElementById('google').innerHTML = google_html;
-
-getPosition(function(err, position) {
-  document.getElementById('browser').innerHTML = err ?
-    'Could not get current position of user. ' + err.toString() :
-    'Got current position of user: ' + JSON.stringify(position);
-});
-</script>
-
+  <h2>google.loader.ClientLocation</h2>
+  <p ng-hide="google">Google location was not set.</p>
+  <ul ng-show="google">
+    <li>Latitude: {{google.latitude}}</li>
+    <li>Longitude: {{google.longitude}}</li>
+    <li>Address: {{google.address.city}}, {{google.address.region}}, {{google.address.country}} ({{google.address.country_code}})</li>
+  </ul>
+</body>

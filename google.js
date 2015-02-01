@@ -1,5 +1,4 @@
-"use strict"; /*jslint indent: 2, browser: true, devel: true */
-/*globals $, _, Backbone, google, KeyState, getPosition, eavesdrop */
+/*jslint browser: true */ /*globals $, _, Backbone, google, Point, Polygon */
 
 var gmap_optionset = {
   frozen: {
@@ -41,103 +40,20 @@ var google_map_events = [
   'mouseup'
 ];
 
-// KeyState comes from common.js
-var down = (new KeyState()).down;
-
-function parseLatLng(s) {
-  // convert a '-45.8166,10.0081' string to a Google LatLng object.
-  var lat_lon_pair = s.split(/,/);
-  return new google.maps.LatLng(lat_lon_pair[0], lat_lon_pair[1]);
+function KeyState() {
+  var down = this.down = {};
+  window.addEventListener('keydown', function(ev) {
+    down[ev.which] = true;
+  }, false);
+  window.addEventListener('keyup', function(ev) {
+    down[ev.which] = false;
+  }, false);
 }
+window.key_state = new KeyState();
 
 /**
                                    MODELS
                                                                             */
-
-// Polygon is one type of Geometry (implicit class)
-var Polygon = Backbone.Model.extend({
-  // fields: type, coordinates
-  initialize: function(opts) {
-    this.set('type', 'Polygon');
-  },
-  toString: function() {
-    var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
-    return [
-      _.min(longitudes_latitudes[0]).toFixed(4),
-      _.min(longitudes_latitudes[1]).toFixed(4),
-      _.max(longitudes_latitudes[0]).toFixed(4),
-      _.max(longitudes_latitudes[1]).toFixed(4)
-    ].join(',');
-  },
-  googleShape: function() {
-    var longitudes_latitudes = _.zip.apply(null, this.get('coordinates'));
-    // center always returns a lon,lat pair.
-    // assume all Polygons are Rectangles, for now.
-    return new google.maps.Rectangle({
-      // LatLngBounds(sw?:LatLng, ne?:LatLng)
-      bounds: new google.maps.LatLngBounds(
-        new google.maps.LatLng(_.min(longitudes_latitudes[1]), _.min(longitudes_latitudes[0])),
-        new google.maps.LatLng(_.max(longitudes_latitudes[1]), _.max(longitudes_latitudes[0]))
-      ),
-      clickable: false
-      // strokeColor: '#FF0000',
-      // strokeOpacity: 0.8,
-      // strokeWeight: 2,
-      // fillColor: '#FF0000',
-      // fillOpacity: 0.35
-    });
-  },
-  focus: function(map) {
-    map.fitBounds(this.googleShape().getBounds());
-  }
-}, {
-  fromLatLngBounds: function(latLngBounds) {
-    var sw = latLngBounds.getSouthWest();
-    var ne = latLngBounds.getNorthEast();
-    return new Geometries.Polygon({
-      coordinates: [
-        [sw.lng(), ne.lat()], // nw
-        [ne.lng(), ne.lat()], // ne
-        [ne.lng(), sw.lat()], // se
-        [sw.lng(), sw.lat()]  // sw
-      ]
-    });
-  }
-});
-
-// Point is the other type of Geometry (implicit class)
-var Point = Backbone.Model.extend({
-  // fields: type, coordinates
-  initialize: function(opts) {
-    this.set('type', 'Point');
-  },
-  toString: function() {
-    var coordinates = this.get('coordinates');
-    return [
-      coordinates[0].toFixed(4),
-      coordinates[1].toFixed(4)
-    ].join(',');
-  },
-  googleShape: function() {
-    var coordinates = this.get('coordinates');
-    return new google.maps.Marker({
-      // GeoJSON is [longitude, latitude]
-      position: new google.maps.LatLng(coordinates[1], coordinates[0]),
-      clickable: false
-    });
-  },
-  focus: function(map) {
-    map.setCenter(this.googleShape().getPosition());
-  }
-}, {
-  fromLatLng: function(latLng) {
-    return new Geometries.Point({
-      coordinates: [latLng.lng(), latLng.lat()]
-    });
-  }
-});
-
-var Geometries = {Polygon: Polygon, Point: Point};
 
 // All GeoJSON is (lon, lat), opposite of Google (GOOG uses latLng pairs)
 var Feature = Backbone.Model.extend({
@@ -150,7 +66,16 @@ var Feature = Backbone.Model.extend({
   },
   parse: function(response, options) {
     // have to type-boost to get a versatile Backbone model
-    response.geometry = new Geometries[response.geometry.type](response.geometry);
+    if (response.geometry.type == 'Point') {
+      response.geometry = new Point(response.geometry);
+    }
+    else if (response.geometry.type == 'Polygon') {
+      response.geometry = new Polygon(response.geometry);
+    }
+    else {
+      throw new Error('Unrecognized Geometry type');
+    }
+
     return response;
   }
 });
@@ -208,7 +133,7 @@ var FeatureRow = Backbone.View.extend({
   render: function() {
     var properties = this.model.get('properties') || {};
     var html = _.template($('#FeatureRow').html(), {
-      type: this.model.get('geometry').get('type'),
+      type: this.model.get('geometry').type,
       coordinates: this.model.toString(),
       label: properties.label
     });
@@ -220,7 +145,7 @@ var FeatureRow = Backbone.View.extend({
       // center always returns a lon,lat pair.
     },
     click: function(ev) {
-      if (down[16]) { // 16 = shift key
+      if (window.key_state.down[16]) { // 16 = shift key
         this.model.collection.remove(this.model);
         this.remove();
       }

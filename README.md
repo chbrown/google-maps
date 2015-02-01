@@ -1,8 +1,8 @@
-## google-maps
+## maps
 
 Tools for doing things with the Google API more quickly and/or easily than with plain Google Maps.
 
-### [chbrown.github.io/google-maps/](http://chbrown.github.io/google-maps/)
+### [chbrown.github.io/maps/](http://chbrown.github.io/maps/)
 
 Features:
 
@@ -148,4 +148,4 @@ Other cool maps
 
 ## License
 
-Copyright © 2013 Christopher Brown. [MIT Licensed](LICENSE).
+Copyright 2011-2015 Christopher Brown. [MIT Licensed](http://opensource.org/licenses/MIT).

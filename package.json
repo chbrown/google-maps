@@ -1,6 +1,12 @@
 {
+  "name": "maps",
+  "version": "0.1.1",
+  "description": "Examples of using maps in browsers",
+  "private": true,
+  "author": "Christopher Brown <io@henrian.com>",
   "staticPattern": "lib/{file}",
   "staticDependencies": {
+    "angular": "*",
     "jquery": "*",
     "underscore": "*",
     "backbone": "*"

@@ -1,15 +1,15 @@
 html {
   height: 100%;
 }
-body {
-  font-family: 'Helvetica Neue', Helvetica, Arial;
-  font-weight: 200;
 
+body {
   height: 100%;
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+
+  font-family: 'Helvetica Neue', Helvetica, Arial;
+  font-weight: 200;
 }
+
 h1, h2, h3, h4, h5, h6 {
   margin: 0.25em 0 0.5em;
 }
@@ -40,4 +40,18 @@ textarea {
 }
 .latitude, .longitude {
   text-align: right;
+}
+
+.map-container {
+  margin: 10px;
+  border: 1px solid #bbb;
+  background-color: #ddd;
+  height: 70%;
+}
+
+.features tr {
+  cursor: normal;
+}
+.features td {
+  padding: 2px 8px 2px 0;
 }

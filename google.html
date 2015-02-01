@@ -1,24 +1,18 @@
 <!DOCTYPE html>
-<meta charset="utf-8">
-<title>Google Maps Geometry</title>
-<link href="maps.css" rel="stylesheet" type="text/css" media="all" />
-<style>
-.map-container {
-  margin: 10px;
-  border: 1px solid #bbb;
-  background-color: #ddd;
-  height: 70%;
-}
-.features tr {
-  cursor: normal;
-}
-.features td {
-  padding: 2px 8px 2px 0;
-}
-</style>
-
-<!-- development link: http://ghkl/maps/google.html -->
-
+<head>
+  <meta charset="utf-8">
+  <title>Google Maps Geometry</title>
+  <link href="site.css" rel="stylesheet" type="text/css" media="all" />
+  <!-- development: http://ghkl/maps/google.html -->
+  <!-- production: http://chbrown.github.io/maps/google.html -->
+  <script src="geometries.js"></script>
+  <script src="lib/underscore.min.js"></script>
+  <script src="lib/jquery.min.js"></script>
+  <script src="lib/backbone.min.js"></script>
+  <script src="lib/jquery.flexibleArea.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCY5L1jgFP2dMeWEAlsw_t29TRgy7adDLc&sensor=true"></script>
+  <script src="google.js"></script>
+</head>
 <body>
   <div class="map-container">
     <div style="height: 100%;" id="map"></div>
@@ -78,16 +72,17 @@
   </form>
   <p></p>
 </script>
-
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCY5L1jgFP2dMeWEAlsw_t29TRgy7adDLc&sensor=true"></script>
-<script src="lib/underscore.min.js"></script>
-<script src="lib/jquery.min.js"></script>
-<script src="lib/backbone.min.js"></script>
-<script src="lib/jquery.flexibleArea.js"></script>
-<script src="common.js"></script>
-
-<script src="google.js"></script>
 <script>
+/*jslint browser: true */ /*globals $, _, Backbone, google, Point, Polygon */
+
+function eavesdrop(emitter, events) {
+  events.forEach(function(event) {
+    emitter.addListener(event, function() {
+      console.info(event, arguments);
+      window.last_event = event;
+    });
+  });
+}
 
 var temporary_rectangle = null;
 var mousedown_latLng = null;
@@ -96,21 +91,26 @@ var dragging = false;
 $(function() {
   var features = new FeatureCollection();
 
+  // convert a '-45.8166,10.0081' string to a Google LatLng object.
+  var center_string = (localStorage.center || '41.8831,-87.6219');
+  var center_parts = center_string.split(',');
+  var center = new google.maps.LatLng(center_parts[0], center_parts[1]);
+
   // map center defaults to Millenium Park, Chicago, IL
   var map = new google.maps.Map($('#map').get(0), {
     zoom: parseInt(localStorage.zoom || 8, 10),
-    center: parseLatLng(localStorage.center || '41.8831,-87.6219'),
+    center: center,
     mapTypeId: google.maps.MapTypeId.ROADMAP
   });
   map.addListener('center_changed', function() {
     localStorage.center = map.getCenter().toUrlValue();
-  })
+  });
   map.addListener('zoom_changed', function() {
     localStorage.zoom = map.getZoom();
-  })
+  });
   map.addListener('mousedown', function(ev) {
     mousedown_latLng = ev.latLng;
-    if (down[16]) { // shift-down
+    if (window.key_state.down[16]) { // shift-down
       temporary_rectangle = new google.maps.Rectangle({
         bounds: new google.maps.LatLngBounds(ev.latLng, ev.latLng),
         clickable: false,
@@ -126,7 +126,7 @@ $(function() {
     //   document mousedown handling elsewhere for deactivation purposes
   });
   map.addListener('mousemove', function(ev) {
-    if (temporary_rectangle && down[16]) { // shift-down
+    if (temporary_rectangle && window.key_state.down[16]) { // shift-down
       var initial_bounds = new google.maps.LatLngBounds(mousedown_latLng, mousedown_latLng);
       temporary_rectangle.setBounds(initial_bounds.extend(ev.latLng));
       // 'lat_lo,lng_lo,lat_hi,lng_hi'
@@ -134,7 +134,7 @@ $(function() {
   });
   map.addListener('mouseup', function(ev) {
     var geometry = null;
-    var label = null
+    var label = null;
     if (temporary_rectangle) {
       geometry = Polygon.fromLatLngBounds(temporary_rectangle.getBounds());
       temporary_rectangle.setMap(null);
@@ -195,24 +195,21 @@ $(function() {
   });
 
   $('#locate').click(function() {
-    getPosition(function(err, position) {
-      if (err) {
-        console.error('Could not get user position: ' + err.toString());
-      }
-      else {
-        var center = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+    // the navigator.geolocation.getCurrentPosition() takes promise-like
+    // callbacks (WTF!), instead of the normal function(err, ...) paradigm.
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var center = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
 
-        var label = 'Location on ' + new Date().toString().match(/^\w+ (.+) GMT/)[1];
-        var feature = new Feature({
-          geometry: Point.fromLatLng(center),
-          properties: {label: label}
-        });
-        features.add(feature);
-        feature.trigger('focus');
-
-      }
+      var label = 'Location on ' + new Date().toString().match(/^\w+ (.+) GMT/)[1];
+      var feature = new Feature({
+        geometry: Point.fromLatLng(center),
+        properties: {label: label}
+      });
+      features.add(feature);
+      feature.trigger('focus');
+    }, function(err) {
+      console.error('Could not get user position: ' + err.toString());
     });
   });
-
 });
 </script>
